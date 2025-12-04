@@ -1,0 +1,8 @@
+{
+  "status": "PASSED",
+  "latency_seconds": 0.4573817253112793,
+  "audio_size_kb": 87.5625,
+  "output_file": "/home/ubuntu/phase0-results/test4_tts_output.mp3",
+  "endpoint": "gtts_service",
+  "note": "gTTS service - vLLM API does not expose Qwen audio generation"
+}

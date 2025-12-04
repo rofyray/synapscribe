@@ -1,0 +1,47 @@
+[
+  {
+    "test_name": "short",
+    "word_count": 20,
+    "text": "Machine learning is transforming software development through intelligent automation and predictive analytics.",
+    "latency_mean_sec": 0.30150699615478516,
+    "latency_median_sec": 0.31290102005004883,
+    "latency_stdev_sec": 0.05451977859491469,
+    "latency_min_sec": 0.24219059944152832,
+    "latency_max_sec": 0.3494293689727783,
+    "estimated_audio_duration_sec": 8.0,
+    "audio_size_kb": 58.5,
+    "gpu_memory_mb": 19028,
+    "endpoint": "gtts_service",
+    "note": "gTTS service - vLLM API does not expose Qwen audio generation"
+  },
+  {
+    "test_name": "medium",
+    "word_count": 50,
+    "text": "Technical debt refers to the implied cost of future reworking required when choosing an easy but limited solution instead of a better approach that would take longer. Like financial debt, technical debt incurs interest payments in the form of extra effort in future development. Organizations must balance delivering features quickly with maintaining code quality.",
+    "latency_mean_sec": 0.8532296021779379,
+    "latency_median_sec": 0.8662753105163574,
+    "latency_stdev_sec": 0.061692370779310286,
+    "latency_min_sec": 0.786057710647583,
+    "latency_max_sec": 0.907355785369873,
+    "estimated_audio_duration_sec": 20.0,
+    "audio_size_kb": 191.4375,
+    "gpu_memory_mb": 19028,
+    "endpoint": "gtts_service",
+    "note": "gTTS service - vLLM API does not expose Qwen audio generation"
+  },
+  {
+    "test_name": "long",
+    "word_count": 100,
+    "text": "Microservices architecture is an approach to developing a single application as a suite of small services, each running in its own process and communicating with lightweight mechanisms. These services are built around business capabilities and independently deployable by fully automated deployment machinery. There is a bare minimum of centralized management of these services, which may be written in different programming languages and use different data storage technologies. This architectural style has become popular for building scalable, resilient applications that can evolve rapidly. However, it also introduces complexity in terms of distributed system challenges, data consistency, and operational overhead.",
+    "latency_mean_sec": 1.9585163593292236,
+    "latency_median_sec": 2.010791063308716,
+    "latency_stdev_sec": 0.20584742952765978,
+    "latency_min_sec": 1.7315714359283447,
+    "latency_max_sec": 2.1331865787506104,
+    "estimated_audio_duration_sec": 40.0,
+    "audio_size_kb": 399.5625,
+    "gpu_memory_mb": 19028,
+    "endpoint": "gtts_service",
+    "note": "gTTS service - vLLM API does not expose Qwen audio generation"
+  }
+]

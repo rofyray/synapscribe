@@ -1,0 +1,8 @@
+{
+  "status": "PASSED",
+  "load_time_seconds": 2.1135506629943848,
+  "tokens_used": 7548,
+  "gpu_memory_mb": 18598,
+  "answer_preview": "DistrictdifferentiatorscienceCYA:\u6709 foto\u011fraf heterogeneous rifts",
+  "architecture_note": "Audio sent per-request, not persistent context"
+}

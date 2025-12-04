@@ -1,0 +1,283 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SynapScribe Simplified MVP
+
+Parameters:
+  EC2PrivateIP:
+    Type: String
+    Description: Private IP of EC2 instance running vLLM and gTTS
+    Default: 172.31.36.1
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 512
+    Environment:
+      Variables:
+        VLLM_ENDPOINT: !Sub 'http://${EC2PrivateIP}:8000'
+        AGENTCORE_ENDPOINT: !Sub 'http://${EC2PrivateIP}:5000'
+
+Resources:
+  # Cognito Identity Pool (Unauthenticated)
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      AllowUnauthenticatedIdentities: true
+      IdentityPoolName: synapscribe-identities
+
+  # IAM Role for unauthenticated users
+  UnauthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref IdentityPool
+      Policies:
+        - PolicyName: UnauthPolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::synapscribe-audio-${AWS::AccountId}/*'
+              - Effect: Allow
+                Action: execute-api:Invoke
+                Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*'
+
+  # Attach role to identity pool
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        unauthenticated: !GetAtt UnauthRole.Arn
+
+  # DynamoDB Sessions Table
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: SynapScribe-Sessions
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: expiresAt
+
+  # WebSocket API Gateway
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: SynapScribeWebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.type
+
+  # Lambda: WebSocketHandler
+  WebSocketHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/websocket_handler/
+      Handler: websocket_handler.lambda_handler
+      Environment:
+        Variables:
+          S3_BUCKET: !Sub 'synapscribe-audio-${AWS::AccountId}'
+          DYNAMODB_TABLE: !Ref SessionsTable
+          API_GATEWAY_ENDPOINT: !Sub '${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Sub 'synapscribe-audio-${AWS::AccountId}'
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - Statement:
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+
+  # Lambda: ValidateLectureFunction
+  ValidateLectureFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/validate_lecture/
+      Handler: validate_lecture.lambda_handler
+      Timeout: 120
+      MemorySize: 1024
+      Environment:
+        Variables:
+          S3_BUCKET: !Sub 'synapscribe-audio-${AWS::AccountId}'
+          DYNAMODB_TABLE: !Ref SessionsTable
+          API_GATEWAY_ENDPOINT: !Sub '${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub 'synapscribe-audio-${AWS::AccountId}'
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - Statement:
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref AudioBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: lectures/
+
+  # S3 Bucket - moved after Lambda to avoid circular dependency
+  AudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'synapscribe-audio-${AWS::AccountId}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteQueriesAfter7Days
+            Status: Enabled
+            Prefix: queries/
+            ExpirationInDays: 7
+          - Id: DeleteResponsesAfter7Days
+            Status: Enabled
+            Prefix: responses/
+            ExpirationInDays: 7
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedHeaders:
+              - '*'
+
+  # WebSocket Integrations
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations'
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations'
+
+  RequestUploadIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations'
+
+  QueryIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations'
+
+  EndSessionIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations'
+
+  # WebSocket Routes
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      Target: !Join ['/', ['integrations', !Ref ConnectIntegration]]
+      AuthorizationType: NONE
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      Target: !Join ['/', ['integrations', !Ref DisconnectIntegration]]
+
+  RequestUploadRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: request_upload
+      Target: !Join ['/', ['integrations', !Ref RequestUploadIntegration]]
+
+  QueryRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: query
+      Target: !Join ['/', ['integrations', !Ref QueryIntegration]]
+
+  EndSessionRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: end_session
+      Target: !Join ['/', ['integrations', !Ref EndSessionIntegration]]
+
+  # Lambda permissions for WebSocket routes
+  WebSocketHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebSocketHandler
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+
+  # WebSocket Deployment
+  WebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - RequestUploadRoute
+      - QueryRoute
+      - EndSessionRoute
+    Properties:
+      ApiId: !Ref WebSocketApi
+
+  # WebSocket Stage
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      DeploymentId: !Ref WebSocketDeployment
+      StageName: Prod
+
+Outputs:
+  WebSocketApiEndpoint:
+    Description: WebSocket API Gateway endpoint URL
+    Value: !Sub 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'
+  AudioBucketName:
+    Description: S3 bucket for audio storage
+    Value: !Ref AudioBucket
+  SessionsTableName:
+    Description: DynamoDB table for sessions
+    Value: !Ref SessionsTable
+  IdentityPoolId:
+    Description: Cognito Identity Pool ID
+    Value: !Ref IdentityPool
+  EC2PrivateIP:
+    Description: EC2 private IP for vLLM and AgentCore endpoints
+    Value: !Ref EC2PrivateIP

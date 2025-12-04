@@ -1,0 +1,12 @@
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "synapscribe-mvp"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EC2PrivateIP=172.31.36.1"
+confirm_changeset = true
+resolve_s3 = true
+s3_prefix = "synapscribe-mvp"

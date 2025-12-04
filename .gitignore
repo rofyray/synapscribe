@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+services/agentcore/venv/
+services/direct_inference/venv/
+
+# Environment variables
+.env
+.env.local
+.env.phase1
+*.env
+
+# SSH Keys (CRITICAL - DO NOT COMMIT)
+*.pem
+*.key
+id_rsa*
+
+# Logs
+*.log
+/var/log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+*.tmp
+*.bak
+
+# Large model files (stored elsewhere)
+/opt/models/
+
+# Test audio (large files)
+test-audio/*.mp3
+test-audio/*.wav
+test-audio/*.webm
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# AWS credentials
+.aws/
+credentials
+
+# Phase 0 results (archived but don't need in repo)
+docs/archive/phase0/results/*.json
+docs/archive/phase0/results/*.csv
