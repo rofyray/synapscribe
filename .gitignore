@@ -56,12 +56,7 @@ test-audio/*.webm
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb
 
 # AWS credentials
 .aws/
 credentials
-
-# Phase 0 results (archived but don't need in repo)
-docs/archive/phase0/results/*.json
-docs/archive/phase0/results/*.csv
