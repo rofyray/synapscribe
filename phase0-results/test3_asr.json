@@ -1,8 +1,0 @@
-{
-  "status": "PASSED",
-  "latency_seconds": 1.6057476997375488,
-  "transcript": "When do we fit into all of this well it's taken us eighteen lectures, humans have made guest appearances may be in the form of scientists, but now at last humans are waiting in the wings, though I'm afraid you're going to still have to wait two more lectures before they make a full entrance with trumpets blaring, but perhaps this long delay is actually helpful, and it can tell us something about the nature of big history. It's a reminder that the story is not",
-  "endpoint": "vllm_chat_completions",
-  "method": "prompt_engineering",
-  "note": "ASR via vLLM prompting - no separate endpoint needed"
-}
