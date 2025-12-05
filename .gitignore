@@ -1,0 +1,21 @@
+# Backend
+__pycache__/
+*.py[cod]
+venv/
+.aws-sam/
+*.env
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+dist/
+build/
+*.log
+
+# Shared
+.vscode/
+.idea/
+.DS_Store
+*.tmp
+*.backup
